@@ -16,6 +16,9 @@ class Settings:
     PORT: int = int(os.getenv("PORT", "8000"))
     RELOAD: bool = os.getenv("RELOAD", "true").lower() == "true"
     
+    # Production Configuration
+    IS_PRODUCTION: bool = os.getenv("ENVIRONMENT", "development").lower() == "production"
+    
     # Database Configuration
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./quiz_app.db")
     

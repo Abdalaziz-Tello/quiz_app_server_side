@@ -22,7 +22,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 # Database setup
 SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+if "sqlite" in SQLALCHEMY_DATABASE_URL.lower():
+    # SQLite configuration
+    engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    # PostgreSQL/MySQL configuration
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -39,6 +44,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Production settings
+if settings.IS_PRODUCTION:
+    # Disable reload in production
+    import uvicorn.config
+    uvicorn.config.LOGGING_CONFIG["loggers"]["uvicorn"]["level"] = "WARNING"
 
 # Database models
 class User(Base):
@@ -416,6 +427,8 @@ def get_yearly_leaderboard(db: Session = Depends(get_db)):
 def read_root():
     return {
         "message": "Welcome to Quiz App API - IP-Based Authentication",
+        "status": "running",
+        "version": "1.0.0",
         "endpoints": {
             "request_otp": "POST /request-otp - Get OTP for your IP",
             "register": "POST /register - Register with nickname",
@@ -425,6 +438,15 @@ def read_root():
             "quiz_attempt": "POST /quiz-attempt - Submit quiz results",
             "leaderboards": "GET /leaderboard/{week|month|year}"
         }
+    }
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for deployment monitoring"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "Quiz App Backend"
     }
 
 @app.get("/user/info", response_model=UserResponse)
