@@ -68,9 +68,9 @@ python init_db.py
 
 - **Health Check**: `GET /health`
 - **Root**: `GET /`
-- **Request OTP**: `POST /request-otp`
-- **Register**: `POST /register`
-- **Login**: `POST /login`
+- **Request OTP**: `POST /request-otp` (phone-based)
+- **Register**: `POST /register` (username + phone)
+- **Login**: `POST /login` (phone + OTP)
 - **Questions**: `GET /questions`
 - **Create Question**: `POST /questions`
 - **Quiz Attempt**: `POST /quiz-attempt`

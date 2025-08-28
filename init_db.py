@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Database initialization script for Quiz App - IP-Based Authentication
+Database initialization script for Quiz App - Phone-Based Authentication
 This script adds sample questions and creates test data
 """
 
@@ -11,19 +11,20 @@ import time
 # API base URL
 BASE_URL = "http://localhost:8000"
 
-def get_client_ip():
-    """Get client IP address (simulated)"""
-    # In a real scenario, this would be the actual client IP
-    # For testing, we'll use a simulated IP
-    return "192.168.1.100"
+def get_test_phone():
+    """Get test phone number"""
+    return "+1234567890"
+
+def get_test_username():
+    """Get test username"""
+    return "admin"
 
 def request_otp():
     """Request OTP for testing"""
     print("Requesting OTP...")
     
     otp_request = {
-        "ip_address": get_client_ip(),
-        "device_id": "init_device_001"
+        "phone_number": get_test_phone()
     }
     
     try:
@@ -44,8 +45,9 @@ def create_test_user():
     print("Creating test user...")
     
     user_data = {
-        "nickname": "AdminUser",
-        "device_id": "init_device_001"
+        "username": get_test_username(),
+        "phone_number": get_test_phone(),
+        "nickname": "AdminUser"
     }
     
     try:
@@ -68,7 +70,7 @@ def login_user(otp_code):
     print("Logging in as admin...")
     
     login_data = {
-        "ip_address": get_client_ip(),
+        "phone_number": get_test_phone(),
         "otp_code": otp_code
     }
     
@@ -200,6 +202,7 @@ def create_sample_questions(token):
             response = requests.post(f"{BASE_URL}/questions", json=question_data, headers=headers)
             if response.status_code == 200:
                 print(f"✅ Question {i} created: {question_data['question_text'][:50]}...")
+                print(f"   Correct Answer: {question_data['correct_answer']}")
                 created_count += 1
             else:
                 print(f"❌ Failed to create question {i}: {response.status_code}")
@@ -240,7 +243,7 @@ def submit_sample_quiz_attempts(token):
 
 def main():
     """Main initialization function"""
-    print("🚀 Quiz App Database Initialization - IP-Based Authentication")
+    print("🚀 Quiz App Database Initialization - Phone-Based Authentication")
     print("=" * 60)
     
     # Wait a moment for server to start
@@ -273,10 +276,11 @@ def main():
     print("📖 You can now test the API with the sample data")
     print(f"🔗 API Documentation: {BASE_URL}/docs")
     print("\n💡 New Authentication Flow:")
-    print("   1. Request OTP for your IP address")
-    print("   2. Use OTP to login (no password needed!)")
+    print("   1. Request OTP for your phone number")
+    print("   2. Use OTP (123456) to login")
     print("   3. OTP expires in 10 minutes")
     print("   4. New OTP available daily")
+    print("   5. Static OTP: 123456 (for testing)")
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Quiz App API - IP-Based Authentication
+Test script for Quiz App API - Phone-Based Authentication
 Run this script to test all the API endpoints
 """
 
@@ -11,19 +11,20 @@ import time
 # API base URL
 BASE_URL = "http://localhost:8000"
 
-def get_client_ip():
-    """Get client IP address (simulated)"""
-    # In a real scenario, this would be the actual client IP
-    # For testing, we'll use a simulated IP
-    return "192.168.1.100"
+def get_test_phone():
+    """Get test phone number"""
+    return "+1234567890"
+
+def get_test_username():
+    """Get test username"""
+    return "testuser123"
 
 def test_request_otp():
     """Test OTP request"""
     print("Testing OTP request...")
     
     otp_request = {
-        "ip_address": get_client_ip(),
-        "device_id": "test_device_001"
+        "phone_number": get_test_phone()
     }
     
     try:
@@ -48,8 +49,9 @@ def test_register():
     print("\nTesting user registration...")
     
     user_data = {
-        "nickname": "TestUser",
-        "device_id": "test_device_001"
+        "username": get_test_username(),
+        "phone_number": get_test_phone(),
+        "nickname": "TestUser"
     }
     
     try:
@@ -74,7 +76,7 @@ def test_login(otp_code):
     print("\nTesting user login...")
     
     login_data = {
-        "ip_address": get_client_ip(),
+        "phone_number": get_test_phone(),
         "otp_code": otp_code
     }
     
@@ -136,6 +138,7 @@ def test_get_questions():
             print(f"✅ Retrieved {len(questions)} questions!")
             for q in questions:
                 print(f"  - {q['question_text']} ({q['points']} points, {q['time_limit']}s)")
+                print(f"    Correct Answer: {q['correct_answer']}")
             return questions
         else:
             print(f"❌ Failed to get questions: {response.status_code}")
@@ -235,9 +238,9 @@ def test_user_info(token):
         if response.status_code == 200:
             user_info = response.json()
             print("✅ User info retrieved successfully!")
+            print(f"  Username: {user_info['username']}")
+            print(f"  Phone Number: {user_info['phone_number']}")
             print(f"  Nickname: {user_info['nickname']}")
-            print(f"  IP Address: {user_info['ip_address']}")
-            print(f"  Device ID: {user_info['device_id']}")
             return user_info
         else:
             print(f"❌ User info failed: {response.status_code}")
@@ -249,7 +252,7 @@ def test_user_info(token):
 
 def main():
     """Run all tests"""
-    print("🚀 Starting Quiz App API Tests - IP-Based Authentication")
+    print("🚀 Starting Quiz App API Tests - Phone-Based Authentication")
     print("=" * 60)
     
     # Test root endpoint
@@ -290,10 +293,11 @@ def main():
     print(f"📖 API Documentation: {BASE_URL}/docs")
     print(f"📚 ReDoc: {BASE_URL}/redoc")
     print("\n💡 New Authentication Flow:")
-    print("   1. Request OTP for your IP address")
-    print("   2. Use OTP to login (no password needed!)")
+    print("   1. Request OTP for your phone number")
+    print("   2. Use OTP (123456) to login")
     print("   3. OTP expires in 10 minutes")
     print("   4. New OTP available daily")
+    print("   5. Static OTP: 123456 (for testing)")
 
 if __name__ == "__main__":
     main()

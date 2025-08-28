@@ -4,10 +4,10 @@ A FastAPI-based backend for a quiz application with JWT authentication, SQLite d
 
 ## Features
 
-- **IP-Based Authentication**: No passwords needed! Uses OTP (One-Time Password) for daily access
-- **Automatic User Creation**: Users are automatically created based on their IP address
-- **Daily OTP System**: New OTP available each day, expires in 10 minutes
-- **Question Management**: CRUD operations for quiz questions with points and time limits
+- **Phone-Based Authentication**: No passwords needed! Uses OTP (One-Time Password) for daily access
+- **Username & Phone Registration**: Users register with unique username and phone number
+- **Static OTP System**: Fixed OTP (123456) for easy testing, expires in 10 minutes
+- **Question Management**: CRUD operations for quiz questions with points, time limits, and correct answers
 - **Quiz Attempts**: Track user quiz attempts with scores and completion times
 - **Leaderboards**: Weekly, monthly, and yearly leaderboards based on quiz performance
 - **SQLite Database**: Lightweight database for storing all application data
@@ -40,28 +40,28 @@ A FastAPI-based backend for a quiz application with JWT authentication, SQLite d
 ### Authentication
 
 #### POST /request-otp
-Request OTP for your IP address
+Request OTP for your phone number
 ```json
 {
-  "ip_address": "192.168.1.100",
-  "device_id": "optional_device_id"
+  "phone_number": "+1234567890"
 }
 ```
 
 #### POST /register
-Register with a nickname (IP address is automatically detected)
+Register with username and phone number
 ```json
 {
-  "nickname": "QuizMaster",
-  "device_id": "optional_device_id"
+  "username": "QuizMaster",
+  "phone_number": "+1234567890",
+  "nickname": "QuizMaster"
 }
 ```
 
 #### POST /login
-Login using IP address and OTP
+Login using phone number and OTP
 ```json
 {
-  "ip_address": "192.168.1.100",
+  "phone_number": "+1234567890",
   "otp_code": "123456"
 }
 ```
@@ -116,8 +116,9 @@ Get yearly leaderboard (top 10 players)
 
 ### Users Table
 - `id`: Primary key
-- `ip_address`: Unique IP address identifier
-- `device_id`: Unique device identifier
+- `username`: Unique username identifier
+- `phone_number`: Unique phone number identifier
+- `ip_address`: IP address (for tracking)
 - `nickname`: User's display name
 - `created_at`: User registration timestamp
 - `last_active`: Last activity timestamp
@@ -125,8 +126,8 @@ Get yearly leaderboard (top 10 players)
 
 ### OTP Table
 - `id`: Primary key
-- `ip_address`: IP address requesting OTP
-- `otp_code`: 6-digit OTP code
+- `phone_number`: Phone number requesting OTP
+- `otp_code`: 6-digit OTP code (static: 123456)
 - `created_at`: OTP creation timestamp
 - `expires_at`: OTP expiration timestamp
 - `is_used`: Whether OTP has been used
@@ -151,23 +152,24 @@ Get yearly leaderboard (top 10 players)
 ## Authentication Flow
 
 ### How It Works:
-1. **Request OTP**: User requests a 6-digit OTP for their IP address
-2. **Receive OTP**: System generates and returns OTP (expires in 10 minutes)
-3. **Login**: User provides IP address and OTP to get JWT token
+1. **Request OTP**: User requests a 6-digit OTP for their phone number
+2. **Receive OTP**: System returns static OTP (123456) that expires in 10 minutes
+3. **Login**: User provides phone number and OTP to get JWT token
 4. **Daily Access**: New OTP available each day (max 5 attempts per day)
 
 ### Benefits:
 - **No Passwords**: Users don't need to remember passwords
-- **IP-Based**: Automatic user identification by IP address
-- **Secure**: OTP expires quickly and is single-use
+- **Phone-Based**: Secure authentication using phone numbers
+- **Static OTP**: Easy testing with fixed OTP (123456)
+- **Secure**: OTPs expire quickly and are single-use
 - **Convenient**: Perfect for daily quiz access
 
 ## Security Features
 
 - **JWT Authentication**: Secure token-based authentication
-- **IP-Based Security**: Users identified by IP address
+- **Phone-Based Security**: Users identified by phone number
 - **OTP System**: One-time passwords that expire quickly
-- **Daily Limits**: Maximum 5 OTP requests per day per IP
+- **Daily Limits**: Maximum 5 OTP requests per day per phone
 - **CORS Support**: Cross-origin resource sharing enabled
 - **Input Validation**: Pydantic models for request validation
 
@@ -177,21 +179,21 @@ Get yearly leaderboard (top 10 players)
 ```bash
 curl -X POST "http://localhost:8000/request-otp" \
      -H "Content-Type: application/json" \
-     -d '{"ip_address": "192.168.1.100", "device_id": "my_device"}'
+     -d '{"phone_number": "+1234567890"}'
 ```
 
-### 2. Register with Nickname
+### 2. Register with Username and Phone
 ```bash
 curl -X POST "http://localhost:8000/register" \
      -H "Content-Type: application/json" \
-     -d '{"nickname": "QuizMaster", "device_id": "my_device"}'
+     -d '{"username": "QuizMaster", "phone_number": "+1234567890", "nickname": "QuizMaster"}'
 ```
 
 ### 3. Login with OTP
 ```bash
 curl -X POST "http://localhost:8000/login" \
      -H "Content-Type: application/json" \
-     -d '{"ip_address": "192.168.1.100", "otp_code": "123456"}'
+     -d '{"phone_number": "+1234567890", "otp_code": "123456"}'
 ```
 
 ### 3. Create a Question (with token)

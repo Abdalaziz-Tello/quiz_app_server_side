@@ -56,8 +56,9 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    ip_address = Column(String, unique=True, index=True)
-    device_id = Column(String, unique=True, index=True)
+    username = Column(String, unique=True, index=True)
+    phone_number = Column(String, unique=True, index=True)
+    ip_address = Column(String, index=True)
     nickname = Column(String, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_active = Column(DateTime, default=datetime.utcnow)
@@ -72,7 +73,7 @@ class Question(Base):
     option_b = Column(String)
     option_c = Column(String)
     option_d = Column(String)
-    correct_answer = Column(String)
+    correct_answer = Column(String)  # A, B, C, or D
     points = Column(Integer)
     time_limit = Column(Integer)  # in seconds
 
@@ -80,7 +81,7 @@ class OTP(Base):
     __tablename__ = "otps"
     
     id = Column(Integer, primary_key=True, index=True)
-    ip_address = Column(String, index=True)
+    phone_number = Column(String, index=True)
     otp_code = Column(String, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime)
@@ -99,25 +100,26 @@ class QuizAttempt(Base):
 
 # Pydantic models
 class UserCreate(BaseModel):
+    username: str
+    phone_number: str
     nickname: str
-    device_id: Optional[str] = None
 
 class UserLogin(BaseModel):
-    ip_address: str
+    phone_number: str
     otp_code: str
 
 class UserResponse(BaseModel):
     id: int
-    ip_address: str
-    device_id: Optional[str]
+    username: str
+    phone_number: str
+    ip_address: Optional[str]
     nickname: str
     created_at: datetime
     last_active: datetime
     is_active: bool
 
 class OTPRequest(BaseModel):
-    ip_address: str
-    device_id: Optional[str] = None
+    phone_number: str
 
 class OTPResponse(BaseModel):
     message: str
@@ -141,6 +143,7 @@ class QuestionResponse(BaseModel):
     option_b: str
     option_c: str
     option_d: str
+    correct_answer: str
     points: int
     time_limit: int
 
@@ -191,8 +194,8 @@ def get_client_ip(request: Request) -> str:
     return request.client.host
 
 def generate_otp() -> str:
-    """Generate a 6-digit OTP"""
-    return str(secrets.randbelow(1000000)).zfill(6)
+    """Generate a static 6-digit OTP for testing"""
+    return "123456"
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -207,14 +210,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        ip_address: str = payload.get("sub")
-        if ip_address is None:
+        phone_number: str = payload.get("sub")
+        if phone_number is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return ip_address
+        return phone_number
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -225,13 +228,13 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 # API endpoints
 @app.post("/request-otp", response_model=OTPResponse)
 def request_otp(otp_request: OTPRequest, request: Request, db: Session = Depends(get_db)):
-    """Request OTP for IP-based authentication"""
-    ip_address = otp_request.ip_address
+    """Request OTP for phone-based authentication"""
+    phone_number = otp_request.phone_number
     
-    # Check if IP already has an active OTP for today
+    # Check if phone already has an active OTP for today
     today = date.today()
     existing_otp = db.query(OTP).filter(
-        OTP.ip_address == ip_address,
+        OTP.phone_number == phone_number,
         OTP.created_at >= today,
         OTP.is_used == False
     ).first()
@@ -254,7 +257,7 @@ def request_otp(otp_request: OTPRequest, request: Request, db: Session = Depends
         # Create new OTP
         otp_code = generate_otp()
         new_otp = OTP(
-            ip_address=ip_address,
+            phone_number=phone_number,
             otp_code=otp_code,
             expires_at=datetime.utcnow() + timedelta(minutes=10),
             daily_attempts=1
@@ -264,27 +267,30 @@ def request_otp(otp_request: OTPRequest, request: Request, db: Session = Depends
     
     return {
         "message": "OTP sent successfully",
-        "otp_code": otp_code,  # In production, send this via email/SMS
+        "otp_code": otp_code,  # Static OTP: 123456
         "expires_in_minutes": 10
     }
 
 @app.post("/register", response_model=UserResponse)
 def register(user: UserCreate, request: Request, db: Session = Depends(get_db)):
-    """Register a new user based on IP address"""
+    """Register a new user with username and phone number"""
     ip_address = get_client_ip(request)
     
-    # Check if IP already registered
-    db_user = db.query(User).filter(User.ip_address == ip_address).first()
+    # Check if username already exists
+    db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="IP address already registered")
+        raise HTTPException(status_code=400, detail="Username already registered")
     
-    # Generate device ID if not provided
-    device_id = user.device_id or f"device_{secrets.token_hex(8)}"
+    # Check if phone number already exists
+    db_user = db.query(User).filter(User.phone_number == user.phone_number).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Phone number already registered")
     
     # Create new user
     db_user = User(
+        username=user.username,
+        phone_number=user.phone_number,
         ip_address=ip_address,
-        device_id=device_id,
         nickname=user.nickname
     )
     db.add(db_user)
@@ -294,16 +300,15 @@ def register(user: UserCreate, request: Request, db: Session = Depends(get_db)):
 
 @app.post("/login", response_model=Token)
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
-    """Login using IP address and OTP"""
-    ip_address = user_credentials.ip_address
+    """Login using phone number and OTP"""
+    phone_number = user_credentials.phone_number
     otp_code = user_credentials.otp_code
     
     # Verify OTP
     otp_record = db.query(OTP).filter(
-        OTP.ip_address == ip_address,
+        OTP.phone_number == phone_number,
         OTP.otp_code == otp_code,
-        OTP.expires_at > datetime.utcnow(),
-        OTP.is_used == False
+        OTP.expires_at > datetime.utcnow()
     ).first()
     
     if not otp_record:
@@ -313,22 +318,13 @@ def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Mark OTP as used
-    otp_record.is_used = True
-    db.commit()
-    
-    # Get or create user
-    user = db.query(User).filter(User.ip_address == ip_address).first()
+    # Get user by phone number
+    user = db.query(User).filter(User.phone_number == phone_number).first()
     if not user:
-        # Auto-create user if not exists
-        user = User(
-            ip_address=ip_address,
-            device_id=f"device_{secrets.token_hex(8)}",
-            nickname=f"User_{ip_address.split('.')[-1]}"
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Please register first."
         )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
     
     # Update last active
     user.last_active = datetime.utcnow()
@@ -337,7 +333,7 @@ def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
     # Generate token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": ip_address}, expires_delta=access_token_expires
+        data={"sub": phone_number}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -347,7 +343,7 @@ def get_questions(db: Session = Depends(get_db)):
     return questions
 
 @app.post("/questions", response_model=QuestionResponse)
-def create_question(question: QuestionCreate, db: Session = Depends(get_db), ip_address: str = Depends(verify_token)):
+def create_question(question: QuestionCreate, db: Session = Depends(get_db), phone_number: str = Depends(verify_token)):
     db_question = Question(**question.model_dump())
     db.add(db_question)
     db.commit()
@@ -355,8 +351,8 @@ def create_question(question: QuestionCreate, db: Session = Depends(get_db), ip_
     return db_question
 
 @app.post("/quiz-attempt", response_model=QuizAttemptResponse)
-def submit_quiz_attempt(attempt: QuizAttemptCreate, db: Session = Depends(get_db), ip_address: str = Depends(verify_token)):
-    user = db.query(User).filter(User.ip_address == ip_address).first()
+def submit_quiz_attempt(attempt: QuizAttemptCreate, db: Session = Depends(get_db), phone_number: str = Depends(verify_token)):
+    user = db.query(User).filter(User.phone_number == phone_number).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -426,17 +422,18 @@ def get_yearly_leaderboard(db: Session = Depends(get_db)):
 @app.get("/")
 def read_root():
     return {
-        "message": "Welcome to Quiz App API - IP-Based Authentication",
+        "message": "Welcome to Quiz App API - Phone-Based Authentication",
         "status": "running",
         "version": "1.0.0",
         "endpoints": {
-            "request_otp": "POST /request-otp - Get OTP for your IP",
-            "register": "POST /register - Register with nickname",
-            "login": "POST /login - Login with IP and OTP",
+            "request_otp": "POST /request-otp - Get OTP for your phone",
+            "register": "POST /register - Register with username and phone",
+            "login": "POST /login - Login with phone and OTP",
             "questions": "GET /questions - Get all questions",
             "create_question": "POST /questions - Create question (authenticated)",
             "quiz_attempt": "POST /quiz-attempt - Submit quiz results",
-            "leaderboards": "GET /leaderboard/{week|month|year}"
+            "leaderboards": "GET /leaderboard/{week|month|year}",
+            "user_info": "GET /user/info - Get user information"
         }
     }
 
@@ -450,9 +447,9 @@ def health_check():
     }
 
 @app.get("/user/info", response_model=UserResponse)
-def get_user_info(request: Request, db: Session = Depends(get_db), ip_address: str = Depends(verify_token)):
+def get_user_info(request: Request, db: Session = Depends(get_db), phone_number: str = Depends(verify_token)):
     """Get current user information"""
-    user = db.query(User).filter(User.ip_address == ip_address).first()
+    user = db.query(User).filter(User.phone_number == phone_number).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
